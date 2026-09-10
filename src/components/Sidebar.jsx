@@ -1,109 +1,122 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Shield, X, ChevronRight, Activity } from 'lucide-react';
+import {
+  X, ChevronRight, Activity,
+  Home, Briefcase, Plus, MessageSquare,
+  Shield, AlertTriangle, Link2, Lightbulb,
+  RefreshCcw, ClipboardList
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const navSections = [
+const navSections = [
   {
     title: 'Journey',
     items: [
-      { path: '/', key: 'home', emoji: '🏠' },
-      { path: '/my-trip', key: 'myTrip', emoji: '🧳' },
-      { path: '/add', key: 'addItinerary', emoji: '➕' },
+      { path: '/', key: 'home', Icon: Home },
+      { path: '/my-trip', key: 'myTrip', Icon: Briefcase },
+      { path: '/add', key: 'addItinerary', Icon: Plus },
     ]
   },
   {
     title: 'Intelligence',
     items: [
-      { path: '/assistant', key: 'travelAssistant', emoji: '💬' },
-      { path: '/risk', key: 'riskMonitor', emoji: '🛡️' },
-      { path: '/disruptions', key: 'disruptions', emoji: '🚨' },
-      { path: '/dependencies', key: 'dependencies', emoji: '🔗' },
-      { path: '/what-if', key: 'whatIf', emoji: '🔮' },
+      { path: '/assistant', key: 'travelAssistant', Icon: MessageSquare },
+      { path: '/risk', key: 'riskMonitor', Icon: Shield },
+      { path: '/disruptions', key: 'disruptions', Icon: AlertTriangle },
+      { path: '/dependencies', key: 'dependencies', Icon: Link2 },
+      { path: '/what-if', key: 'whatIf', Icon: Lightbulb },
     ]
   },
   {
     title: 'Recovery',
     items: [
-      { path: '/recovery', key: 'recoveryPlans', emoji: '🔄' },
-      { path: '/recovery-monitor', key: 'recoveryMonitor', emoji: '📋' },
+      { path: '/recovery', key: 'recoveryPlans', Icon: RefreshCcw },
+      { path: '/recovery-monitor', key: 'recoveryMonitor', Icon: ClipboardList },
     ]
   }
 ];
+
+export { navSections };
 
 export default function Sidebar({ isOpen, setIsOpen }) {
   const { t, tripHealth, activeDisruption, recoveryApplied, bookings } = useStore();
   const location = useLocation();
 
-  const getHealthColor = (h) => h >= 80 ? 'text-green-500' : h >= 60 ? 'text-amber-500' : 'text-red-500';
+  const getHealthColor = (h) => h >= 80 ? 'text-green-400' : h >= 60 ? 'text-amber-400' : 'text-red-400';
 
   const sidebarContent = (
-    <div className="h-full flex flex-col justify-between bg-white border-r border-slate-200/80 select-none">
-      {/* Brand Header */}
+    <div className="app-sidebar">
       <div>
-        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
-          <Link to="/" onClick={() => setIsOpen(false)} className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-teal-400 via-teal-500 to-[#2E86AB] rounded-xl flex items-center justify-center shadow-md shadow-teal-500/20">
-              <Shield className="h-5 w-5 text-white" />
-            </div>
+        {/* Brand */}
+        <div className="app-sidebar__brand">
+          <Link to="/" onClick={() => setIsOpen(false)}>
+            <img src="/raahi-logo.svg" alt="Raahi" className="sidebar-logo" />
             <div>
-              <span className="font-extrabold text-xl text-[#1B2A4A] tracking-tight block leading-none" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <span
+                className="font-extrabold text-xl tracking-tight block leading-none"
+                style={{ color: '#e8f0e8' }}
+              >
                 RAAHI
               </span>
-              <span className="text-[10px] font-bold text-teal-600 tracking-wider uppercase">
-                Resilience Engine
+              <span
+                className="text-[10px] font-bold tracking-widest uppercase"
+                style={{ color: 'rgba(180,210,180,.4)' }}
+              >
+                Travel Operations
               </span>
             </div>
           </Link>
-
-          {/* Close button for mobile/tablet */}
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-1.5 rounded-lg"
+            style={{ color: 'rgba(180,210,180,.45)', background: 'transparent' }}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Sections */}
-        <div className="px-3 py-4 space-y-6 overflow-y-auto max-h-[calc(100vh-180px)]">
+        {/* Navigation */}
+        <div
+          className="px-3 py-4 space-y-5 overflow-y-auto"
+          style={{ maxHeight: 'calc(100vh - 200px)' }}
+        >
           {navSections.map((section, idx) => (
             <div key={idx}>
-              <div className="px-3 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                {section.title}
-              </div>
-              <div className="space-y-1">
-                {section.items.map(item => {
-                  const isActive = location.pathname === item.path;
-                  const isDisruption = item.key === 'disruptions' && activeDisruption && !recoveryApplied;
-
+              <div className="px-3 mb-1.5 sidebar-section-title">{section.title}</div>
+              <div className="space-y-0.5">
+                {section.items.map(({ path, key, Icon }) => {
+                  const isActive = location.pathname === path;
+                  const isAlert = key === 'disruptions' && activeDisruption && !recoveryApplied;
                   return (
                     <Link
-                      key={item.path}
-                      to={item.path}
+                      key={path}
+                      to={path}
                       onClick={() => setIsOpen(false)}
-                      className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                        isActive
-                          ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-md shadow-teal-500/20'
-                          : isDisruption
-                          ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                          : 'text-slate-600 hover:text-[#1B2A4A] hover:bg-slate-50'
-                      }`}
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150"
+                      style={{
+                        background: isActive
+                          ? 'rgba(255,255,255,.1)'
+                          : isAlert ? 'rgba(220,50,50,.14)' : 'transparent',
+                        color: isActive
+                          ? '#f0ece0'
+                          : isAlert ? '#fca5a5'
+                          : 'rgba(184,208,176,.68)',
+                        borderLeft: isActive
+                          ? '2px solid rgba(240,236,224,.35)'
+                          : '2px solid transparent',
+                      }}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg leading-none">{item.emoji}</span>
-                        <span>{t(item.key)}</span>
+                      <div className="flex items-center gap-2.5">
+                        <Icon size={14} style={{ opacity: isActive ? 0.85 : 0.5 }} />
+                        <span>{t(key)}</span>
                       </div>
-
-                      {isDisruption ? (
+                      {isAlert ? (
                         <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400" />
                         </span>
-                      ) : (
-                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${
-                          isActive ? 'text-white' : 'text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5'
-                        }`} />
+                      ) : isActive && (
+                        <ChevronRight size={12} style={{ opacity: 0.35 }} />
                       )}
                     </Link>
                   );
@@ -114,29 +127,40 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </div>
       </div>
 
-      {/* Bottom Health & Trip Widget */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-        <Link to="/my-trip" onClick={() => setIsOpen(false)} className="block bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-teal-600" /> {t('tripHealth')}
+      {/* Trip Health Widget */}
+      <div className="sidebar-health">
+        <Link to="/my-trip" onClick={() => setIsOpen(false)} className="block">
+          <div className="flex items-center justify-between mb-3">
+            <span
+              className="text-[11px] font-bold flex items-center gap-1.5 tracking-wider uppercase"
+              style={{ color: 'rgba(180,210,180,.45)' }}
+            >
+              <Activity size={12} style={{ color: 'rgba(140,200,140,.6)' }} />
+              Trip Health
             </span>
             <span className={`text-sm font-extrabold ${getHealthColor(tripHealth)}`}>
               {tripHealth}/100
             </span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div
+            className="w-full h-1 rounded-full overflow-hidden"
+            style={{ background: 'rgba(255,255,255,.08)' }}
+          >
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
+              className={`h-full rounded-full transition-all duration-700 ${
                 tripHealth >= 80 ? 'bg-green-500' : tripHealth >= 60 ? 'bg-amber-500' : 'bg-red-500'
               }`}
               style={{ width: `${tripHealth}%` }}
             />
           </div>
-          <p className="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
-            <span>{bookings.length} Bookings Live</span>
-            <span className="text-teal-600 font-semibold hover:underline">Details →</span>
-          </p>
+          <div className="flex items-center justify-between mt-2.5">
+            <span style={{ color: 'rgba(180,210,180,.32)', fontSize: '10px' }}>
+              {bookings.length} bookings monitored
+            </span>
+            <span style={{ color: 'rgba(140,200,140,.6)', fontSize: '10px', fontWeight: 600 }}>
+              View details
+            </span>
+          </div>
         </Link>
       </div>
     </div>
@@ -144,30 +168,21 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
   return (
     <>
-      {/* Desktop / Laptop Persistent Sidebar */}
       <aside className="hidden lg:block w-64 xl:w-72 fixed inset-y-0 left-0 z-40">
         {sidebarContent}
       </aside>
-
-      {/* Mobile / Tablet Drawer Sidebar */}
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
-            {/* Backdrop */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             />
-            {/* Drawer */}
             <motion.div
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-              className="fixed inset-y-0 left-0 w-72 max-w-[85vw] shadow-2xl z-10"
+              initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="fixed inset-y-0 left-0 w-72 max-w-[85vw] z-10"
             >
               {sidebarContent}
             </motion.div>

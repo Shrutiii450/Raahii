@@ -7,7 +7,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-[#f4f1e8] flex">
       {/* Left Navigation Sidebar */}
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
@@ -17,7 +17,7 @@ export default function Layout() {
         <Navbar onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
 
         {/* Page Views Container */}
-        <main className="flex-1 pt-16 min-h-[calc(100vh-64px)] pb-12">
+        <main className="flex-1 pt-16 min-h-[calc(100vh-64px)] pb-12 bg-[#f4f1e8]">
           <Outlet />
         </main>
       </div>

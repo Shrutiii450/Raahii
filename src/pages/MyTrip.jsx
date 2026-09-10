@@ -29,10 +29,13 @@ export default function MyTrip() {
         <div className="flex-1 w-full">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                🧳 {t('myTrip')}
+              <p style={{ margin: '0 0 6px', color: '#5a7a3a', fontSize: '10px', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase' }}>
+                Your Journey
+              </p>
+              <h1 style={{ margin: 0, fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(32px, 4vw, 52px)', fontWeight: 700, letterSpacing: '-.03em', color: '#162518', lineHeight: 1.0 }}>
+                {t('myTrip')}
               </h1>
-              <p className="text-sm sm:text-base text-slate-500 mt-1">Mumbai → Delhi → Jaipur • {t('traveler')}: Shruti</p>
+              <p className="text-sm text-slate-500 mt-2">Mumbai → Delhi → Jaipur &nbsp;·&nbsp; {t('traveler')}: Shruti</p>
             </div>
             {(activeDisruption || recoveryApplied) && (
               <button onClick={resetAll} className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors w-fit">

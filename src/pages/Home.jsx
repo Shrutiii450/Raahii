@@ -1,451 +1,481 @@
-import { motion, useInView } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  ArrowRight, Check, ChevronRight, CircleAlert, Clock3, MapPin, ShieldCheck,
+  Sparkles, TrainFront, WalletCards, RefreshCcw, ChevronDown, ChevronUp, AlertTriangle
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { ArrowRight, Shield, Zap, Star, DollarSign, ChevronDown } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
+import { monitoringService } from '../services/monitoringService';
+import heroImage from '../assets/hero.png';
 
-function AnimatedCounter({ target, duration = 2000, prefix = '', suffix = '' }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
+const travelImages = {
+  hero: heroImage,
+  mountain: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1000&q=85',
+  road: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=720&q=85',
+};
 
-  useEffect(() => {
-    if (!isInView) return;
-    let start = 0;
-    const step = target / (duration / 16);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= target) { setCount(target); clearInterval(timer); }
-      else setCount(Math.floor(start));
-    }, 16);
-    return () => clearInterval(timer);
-  }, [isInView, target, duration]);
+const typeIcons = { flight: '✈️', cab: '🚕', hotel: '🏨', activity: '🎫', train: '🚆' };
 
-  return <span ref={ref}>{prefix}{count.toLocaleString()}{suffix}</span>;
-}
+// ── 1. LIVE JOURNEY PANEL ──────────────────────────────────────────────────
+function LiveJourneyPanel({ bookings, tripHealth, activeDisruption }) {
+  const [expandedId, setExpandedId] = useState(null);
 
-function ScrollSection({ children, className = '' }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
+  const toggleExpand = (id) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'confirmed': return 'ljp-status-confirmed';
+      case 'delayed': return 'ljp-status-delayed';
+      case 'atRisk': return 'ljp-status-atRisk';
+      case 'missed': return 'ljp-status-missed';
+      default: return 'ljp-status-default';
+    }
+  };
+
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 60 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.8, ease: 'easeOut' }}
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <div className="live-journey-panel">
+      <div className="ljp-header">
+        <div>
+          <p className="ljp-eyebrow">Current Journey</p>
+          <h3 className="ljp-route">Mumbai → Delhi → Jaipur</h3>
+          <p className="ljp-dates">12 Oct — 16 Oct 2025</p>
+        </div>
+        <div className="ljp-status-dots">
+          <span className="ljp-dot ljp-dot--green">● Protected</span>
+          <span className="ljp-dot ljp-dot--pulse">● Live Monitoring</span>
+        </div>
+      </div>
+
+      <div className="ljp-health">
+        <div>
+          <span className="ljp-eyebrow">Trip Health</span>
+          <div className="ljp-health-left">
+            <span className="ljp-score">{tripHealth}</span>
+            <span className="ljp-score-denom">/100</span>
+          </div>
+        </div>
+        <span className="ljp-health-label" style={{ color: tripHealth >= 80 ? '#2d5230' : '#a24d3b' }}>
+          {tripHealth >= 80 ? 'Excellent' : tripHealth >= 60 ? 'Moderate Risk' : 'High Risk'}
+        </span>
+      </div>
+
+      <div className="ljp-timeline">
+        {bookings.map((b, idx) => {
+          const isExpanded = expandedId === b.id;
+          return (
+            <div key={b.id}>
+              <div
+                className={`ljp-item ${isExpanded ? 'ljp-item--expanded' : ''}`}
+                onClick={() => toggleExpand(b.id)}
+              >
+                <span className="ljp-item-icon">{b.emoji || typeIcons[b.type] || '•'}</span>
+                <div className="ljp-item-body">
+                  <span className="ljp-item-name">{b.name}</span>
+                  <span className="ljp-item-meta">{b.startTime} · {b.from}</span>
+                </div>
+                <div className="ljp-item-right">
+                  <span className={`ljp-status-badge ${getStatusBadgeClass(b.status)}`}>
+                    {b.status === 'confirmed' ? 'Confirmed' : b.status === 'atRisk' ? 'Monitoring' : b.status}
+                  </span>
+                  {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="ljp-item-detail">
+                      <div className="ljp-detail-grid">
+                        <div><span>Reference</span><strong>{b.bookingRef || 'N/A'}</strong></div>
+                        <div><span>Est. Cost</span><strong>₹{b.cost?.toLocaleString() || '0'}</strong></div>
+                        <div><span>Policy</span><strong>{b.cancellationPolicy || 'Standard'}</strong></div>
+                        <div><span>Refund</span><strong>{b.refund || 'Standard'}</strong></div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              {idx < bookings.length - 1 && <div className="ljp-connector bg-slate-200" />}
+            </div>
+          );
+        })}
+      </div>
+
+      <Link to="/my-trip" className="ljp-full-link">
+        View Complete Itinerary Details →
+      </Link>
+    </div>
   );
 }
 
-const floatingCards = [
-  { emoji: '✈️', label: 'Flight', delay: 0, x: '5%', y: '20%' },
-  { emoji: '🚕', label: 'Transfer', delay: 0.5, x: '80%', y: '15%' },
-  { emoji: '🏨', label: 'Hotel', delay: 1, x: '85%', y: '60%' },
-  { emoji: '🎫', label: 'Activity', delay: 1.5, x: '10%', y: '65%' },
-  { emoji: '🚆', label: 'Train', delay: 2, x: '75%', y: '85%' },
-];
-
-const timelineSteps = [
-  { emoji: '✈️', name: 'Flight AI-204', sub: 'Mumbai → Delhi', time: '10:30 AM', status: 'confirmed' },
-  { emoji: '🚕', name: 'Airport Transfer', sub: 'Delhi Airport → Hotel', time: '1:45 PM', status: 'confirmed' },
-  { emoji: '🏨', name: 'Hotel Oberoi', sub: 'Delhi', time: '3:00 PM', status: 'confirmed' },
-  { emoji: '🎫', name: 'Arijit Singh Concert', sub: 'JLN Stadium', time: '7:30 PM', status: 'confirmed' },
-  { emoji: '🚆', name: 'Shatabdi Express', sub: 'Delhi → Jaipur', time: '8:00 AM', status: 'confirmed' },
-];
-
-export default function Home() {
-  const { t, language } = useStore();
-  const [disruptionShown, setDisruptionShown] = useState(false);
-  const disruptRef = useRef(null);
-  const disruptInView = useInView(disruptRef, { once: true, margin: '-100px' });
+// ── 2. LIVE MONITORING DASHBOARD BAR ──────────────────────────────────────
+function MonitoringBar() {
+  const [secondsAgo, setSecondsAgo] = useState(14);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'checking' | 'updated'
 
   useEffect(() => {
-    if (disruptInView) {
-      const timer = setTimeout(() => setDisruptionShown(true), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [disruptInView]);
+    const timer = setInterval(() => {
+      setSecondsAgo((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleRefresh = async () => {
+    setStatus('checking');
+    await monitoringService.refresh();
+    setStatus('updated');
+    setSecondsAgo(0);
+    setTimeout(() => {
+      setStatus('idle');
+    }, 3000);
+  };
 
   return (
-    <div className="flex flex-col">
-      {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #1B2A4A 0%, #1a3a5c 50%, #14404f 100%)' }}>
-        {/* Floating Cards */}
-        {floatingCards.map((card, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 0.15, scale: 1, y: [0, -15, 0] }}
-            transition={{ opacity: { delay: card.delay, duration: 1 }, scale: { delay: card.delay, duration: 0.8 }, y: { repeat: Infinity, duration: 4 + i, ease: 'easeInOut' } }}
-            className="absolute hidden md:block bg-white/90 rounded-2xl p-4 shadow-2xl backdrop-blur-sm"
-            style={{ left: card.x, top: card.y }}
+    <section className="monitoring-panel">
+      <div className="monitoring-panel__inner">
+        <div className="monitoring-panel__left">
+          <div className="monitoring-badge">
+            <span className="monitoring-pulse" />
+            <span>RAAHI IS WATCHING</span>
+          </div>
+
+          <div className="monitoring-categories">
+            <div className="mon-cat"><span>✈ Transport</span><b>3 bookings</b></div>
+            <div className="mon-cat mon-cat--simulated">
+              <span>☁ Weather</span><b>2 destinations</b>
+              <span className="sim-badge">SIMULATED</span>
+            </div>
+            <div className="mon-cat"><span>🏨 Lodging</span><b>2 bookings</b></div>
+            <div className="mon-cat"><span>📍 Activities</span><b>4 planned</b></div>
+          </div>
+        </div>
+
+        <div className="monitoring-panel__right">
+          <span className={`monitoring-status-text ${status === 'checking' ? 'mon-status-checking' : status === 'updated' ? 'mon-status-updated' : ''}`}>
+            {status === 'checking' ? 'CHECKING JOURNEY...' : status === 'updated' ? 'JOURNEY UPDATED · Just now' : `Last checked: ${secondsAgo}s ago`}
+          </span>
+
+          <button
+            onClick={handleRefresh}
+            disabled={status === 'checking'}
+            className="refresh-btn"
           >
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{card.emoji}</span>
-              <span className="text-sm font-semibold text-slate-800">{card.label}</span>
+            <RefreshCcw size={12} className={status === 'checking' ? 'spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── 3. ROUTE MAP COMPONENT ──────────────────────────────────────────────────
+function RouteMap() {
+  const stops = [
+    { city: 'Mumbai', status: 'Completed', detail: 'Departed 12 Oct', type: 'completed' },
+    { city: 'Delhi', status: 'Current / Monitoring', detail: 'Arrived 13 Oct · Active', type: 'current' },
+    { city: 'Jaipur', status: 'Upcoming', detail: 'Scheduled 16 Oct', type: 'upcoming' },
+  ];
+
+  return (
+    <div className="route-map">
+      <p className="eyebrow">Journey Corridor</p>
+      <h3 className="font-heading text-xl text-slate-900 font-medium">Route Visualization</h3>
+      <div className="route-map__stops">
+        {stops.map((stop, index) => (
+          <div key={stop.city} className="route-stop">
+            <div className="route-stop__visual">
+              <span className={`route-dot route-dot--${stop.type}`} />
+              {index < stops.length - 1 && (
+                <div className={`route-line route-line--${stop.type}`} />
+              )}
             </div>
-          </motion.div>
+            <div className="route-stop__info">
+              <strong>{stop.city}</strong>
+              <span className="route-date">{stop.detail}</span>
+              <span className={`route-state route-state--${stop.type}`}>{stop.status}</span>
+            </div>
+          </div>
         ))}
+      </div>
+    </div>
+  );
+}
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1 }}>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white/90 px-4 py-2 rounded-full text-sm mb-8">
-              <Shield className="w-4 h-4 text-teal-400" /> Intelligent Travel Resilience Engine
-            </motion.div>
+// ── 4. JOURNEY HEALTH ASSESSMENT COMPONENT ────────────────────────────────
+function JourneyHealthAssessment({ tripHealth, getRiskConnections }) {
+  const connections = getRiskConnections();
+  const highOrMed = connections.find((c) => c.risk !== 'low');
 
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-4 leading-tight tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('heroTitle')}
+  return (
+    <div className="journey-health">
+      <div className="journey-health__score">
+        <p className="eyebrow">Health Index</p>
+        <div className="jh-number">
+          <span style={{ color: tripHealth >= 80 ? '#2d5230' : '#a24d3b' }}>{tripHealth}</span>
+          <span className="jh-denom">/100</span>
+        </div>
+        <span className="jh-label">{tripHealth >= 80 ? 'Excellent Assessment' : 'Attention Required'}</span>
+        <p className="jh-note">Current assessment (simulated & live data blend)</p>
+      </div>
+
+      <div className="journey-health__grid">
+        <div className="jh-category jh-category--good">
+          <span className="jh-cat-name">Transport</span>
+          <div className="jh-cat-status">
+            <span className="jh-dot jh-dot--good" />
+            <span>Stable</span>
+          </div>
+        </div>
+
+        <div className="jh-category jh-category--warn">
+          <span className="jh-cat-name">
+            Weather <span className="sim-badge" style={{ fontSize: '6px' }}>SIM</span>
+          </span>
+          <div className="jh-cat-status">
+            <span className="jh-dot jh-dot--warn" />
+            <span>Watch</span>
+          </div>
+        </div>
+
+        <div className={`jh-category ${highOrMed ? 'jh-category--warn' : 'jh-category--good'}`}>
+          <span className="jh-cat-name">Connections</span>
+          <div className="jh-cat-status">
+            <span className={`jh-dot ${highOrMed ? 'jh-dot--warn' : 'jh-dot--good'}`} />
+            <span>{highOrMed ? 'Tight Buffer' : 'Stable'}</span>
+          </div>
+        </div>
+
+        <div className="jh-category jh-category--good">
+          <span className="jh-cat-name">Accommodation</span>
+          <div className="jh-cat-status">
+            <span className="jh-dot jh-dot--good" />
+            <span>Stable</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 5. LIVE ACTIVITY FEED COMPONENT ───────────────────────────────────────
+function ActivityFeed({ bookings }) {
+  const [activities] = useState(() => monitoringService.getInitialActivityFeed(bookings));
+
+  return (
+    <section className="activity-feed-section">
+      <div className="max-w-[1120px] mx-auto">
+        <p className="eyebrow">Real-Time Operational Audit</p>
+        <h3>Live Journey Activity Feed</h3>
+
+        <div className="activity-feed__list">
+          {activities.map((act) => (
+            <div key={act.id} className="activity-item">
+              <span className="activity-time">{act.time}</span>
+              <span className={`activity-indicator activity-indicator--${act.status}`} />
+              <div className="activity-body">
+                <span className="activity-text">{act.text}</span>
+                <span className="activity-detail">{act.detail}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── MAIN HOME PAGE ────────────────────────────────────────────────────────
+export default function Home() {
+  const { t, bookings, tripHealth, activeDisruption, recoveryApplied, getRiskConnections } = useStore();
+
+  return (
+    <div className="product-home">
+      {/* Live Monitoring Dashboard Bar */}
+      <MonitoringBar />
+
+      {/* Editorial Hero */}
+      <section className="home-editorial-hero">
+        <div className="home-hero-grid">
+          {/* Left: Copy */}
+          <div className="home-hero-copy">
+            <p className="eyebrow">INTELLIGENT TRAVEL RESILIENCE</p>
+            <h1>
+              TRAVEL PLANS CHANGE.<br />
+              <em>Raahi adapts.</em>
             </h1>
-
-            {language === 'en' && (
-              <p className="text-xl md:text-2xl text-teal-300/80 mb-6 font-medium" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                आपकी यात्रा। हर कदम पर सुरक्षित।
-              </p>
-            )}
-
-            <p className="text-lg text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-              {t('heroSubtitle')}
+            <p className="hero-description">
+              Raahi understands your complete itinerary, detects disruptions before they affect your journey,
+              and helps you recover with intelligent alternatives.
             </p>
-
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link to="/my-trip"
-                className="bg-teal-500 hover:bg-teal-400 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 shadow-lg shadow-teal-500/30 hover:shadow-teal-400/40 hover:scale-[1.02] flex items-center justify-center gap-2">
-                {t('viewMyTrip')} <ArrowRight className="w-5 h-5" />
+            <div className="hero-actions">
+              <Link to="/add" className="button button--primary">
+                Build my itinerary <ArrowRight size={16} />
               </Link>
-              <Link to="/add"
-                className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/25 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 hover:scale-[1.02]">
-                {t('buildMyItinerary')}
+              <Link to="/my-trip" className="text-link">
+                View my trip <ChevronRight size={16} />
               </Link>
             </div>
+            <div className="hero-places">
+              <span className="place-thumb" style={{ backgroundImage: `url(${travelImages.mountain})` }} />
+              <span>
+                <small>Monitored Journey Corridor</small>
+                <strong>Mumbai → Delhi → Jaipur</strong>
+                <i className="not-italic text-slate-500 font-sans text-xs font-semibold mt-0.5 block">
+                  {bookings.length} bookings monitored in real-time
+                </i>
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Live Journey Panel */}
+          <motion.div
+            className="home-hero-product"
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <LiveJourneyPanel bookings={bookings} tripHealth={tripHealth} activeDisruption={activeDisruption} />
           </motion.div>
-
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2 }}
-            className="mt-16 flex justify-center">
-            <ChevronDown className="w-8 h-8 text-white/40 animate-bounce" />
-          </motion.div>
         </div>
       </section>
 
-      {/* Section 1: Connected Journey */}
-      <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4">
-          <ScrollSection className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('story1Title')}
+      {/* Route & Health Section */}
+      <section className="route-health-section">
+        <div className="max-w-[1120px] mx-auto route-health-grid">
+          <RouteMap />
+          <JourneyHealthAssessment tripHealth={tripHealth} getRiskConnections={getRiskConnections} />
+        </div>
+      </section>
+
+      {/* Stats Row */}
+      <section className="home-stats-row">
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-number">
+              {tripHealth}<small>%</small>
+            </span>
+            <span className="stat-label">Trip Health Score</span>
+            <span className="stat-sub">Protected & actively monitored</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">{bookings.length}</span>
+            <span className="stat-label">Live Bookings</span>
+            <span className="stat-sub">All tracked in real-time</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-number">
+              3<small>×</small>
+            </span>
+            <span className="stat-label">Recovery Options</span>
+            <span className="stat-sub">Available for any disruption</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Activity Feed */}
+      <ActivityFeed bookings={bookings} />
+
+      {/* Itinerary Overview */}
+      <section className="home-section home-section--intro">
+        <div className="section-grid">
+          <div>
+            <p className="eyebrow">One intelligent view</p>
+            <h2>
+              Your entire journey.<br />
+              <em>Nothing left to chance.</em>
             </h2>
-            <p className="text-lg text-slate-500">{t('story1Sub')}</p>
-          </ScrollSection>
-
-          <div className="relative max-w-md mx-auto">
-            <div className="absolute left-8 top-8 bottom-8 w-0.5 bg-gradient-to-b from-teal-400 via-teal-300 to-teal-200"></div>
-            {timelineSteps.map((step, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -40 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15, duration: 0.5 }}
-                className="relative pl-20 mb-6 last:mb-0"
-              >
-                <div className="absolute left-[22px] top-4 w-5 h-5 bg-teal-500 rounded-full border-4 border-white shadow-md z-10"></div>
-                <div className="bg-white border border-slate-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{step.emoji}</span>
-                      <div>
-                        <p className="font-semibold text-slate-800">{step.name}</p>
-                        <p className="text-sm text-slate-500">{step.sub}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-slate-600">{step.time}</p>
-                      <span className="inline-flex items-center text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">🟢 {t('confirmed')}</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
           </div>
-        </div>
-      </section>
-
-      {/* Section 2: Something Changes */}
-      <section ref={disruptRef} className="py-24 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-            <ScrollSection>
-              <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {t('story2Title')}
-              </h2>
-              <p className="text-lg text-slate-500 mb-6">{t('story2Sub')}</p>
-              <div className="inline-flex items-center text-red-600 bg-red-50 px-4 py-2 rounded-full text-sm font-semibold animate-pulse">
-                🚨 Flight Delay Alert
-              </div>
-            </ScrollSection>
-
-            <ScrollSection>
-              <div className="bg-white p-6 rounded-2xl shadow-lg border-2 border-red-100 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-red-500 to-orange-500"></div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">✈️</span>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-lg">Flight AI-204</h3>
-                      <p className="text-sm text-slate-500">Mumbai → Delhi</p>
-                    </div>
-                  </div>
-                  <motion.span
-                    initial={{ backgroundColor: '#dcfce7', color: '#15803d' }}
-                    animate={disruptionShown ? { backgroundColor: '#fef2f2', color: '#dc2626' } : {}}
-                    transition={{ duration: 0.8 }}
-                    className="px-4 py-1.5 rounded-full text-sm font-bold"
-                  >
-                    {disruptionShown ? '🔴 Delayed 3h' : '🟢 On Time'}
-                  </motion.span>
-                </div>
-
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={disruptionShown ? { opacity: 1, height: 'auto' } : {}} transition={{ delay: 0.5 }} className="space-y-3 overflow-hidden">
-                  <div className="flex items-start p-3 bg-red-50 rounded-lg">
-                    <span className="text-xl mr-3">🚕</span>
-                    <div>
-                      <p className="font-semibold text-sm text-red-800">Airport Cab — Missed</p>
-                      <p className="text-xs text-red-600">Pickup was at 1:45 PM, flight now arrives 4:15 PM</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start p-3 bg-amber-50 rounded-lg">
-                    <span className="text-xl mr-3">🏨</span>
-                    <div>
-                      <p className="font-semibold text-sm text-amber-800">Hotel — Late Check-in</p>
-                      <p className="text-xs text-amber-600">Arrival delayed to ~6:00 PM</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start p-3 bg-amber-50 rounded-lg">
-                    <span className="text-xl mr-3">🎫</span>
-                    <div>
-                      <p className="font-semibold text-sm text-amber-800">Concert — At Risk</p>
-                      <p className="text-xs text-amber-600">Reduced buffer, tight timing</p>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </ScrollSection>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 3: Ripple Effect */}
-      <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <ScrollSection>
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('story3Title')}
-            </h2>
-            <p className="text-lg text-slate-500 mb-12">{t('story3Sub')}</p>
-          </ScrollSection>
-
-          <div className="relative max-w-sm mx-auto">
-            {[
-              { emoji: '✈️', name: 'Flight', status: 'delayed', color: 'red' },
-              { emoji: '🚕', name: 'Transfer', status: 'missed', color: 'red' },
-              { emoji: '🏨', name: 'Hotel', status: 'atRisk', color: 'amber' },
-              { emoji: '🎫', name: 'Concert', status: 'atRisk', color: 'amber' },
-              { emoji: '🚆', name: 'Train', status: 'atRisk', color: 'yellow' },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.3, duration: 0.5 }}
-              >
-                <div className={`flex items-center justify-between p-4 rounded-xl mb-2 border-2 ${
-                  item.color === 'red' ? 'bg-red-50 border-red-200' :
-                  item.color === 'amber' ? 'bg-amber-50 border-amber-200' :
-                  'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.emoji}</span>
-                    <span className="font-semibold text-slate-800">{item.name}</span>
-                  </div>
-                  <span className={`text-sm font-bold ${
-                    item.color === 'red' ? 'text-red-600' : item.color === 'amber' ? 'text-amber-600' : 'text-yellow-600'
-                  }`}>
-                    {item.status === 'delayed' ? '🔴 Delayed' : item.status === 'missed' ? '🔴 Missed' : '🟠 At Risk'}
-                  </span>
-                </div>
-                {i < 4 && (
-                  <motion.div
-                    initial={{ scaleY: 0 }}
-                    whileInView={{ scaleY: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.3 + 0.2 }}
-                    className="w-0.5 h-6 mx-auto bg-red-300 origin-top"
-                  />
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section 4: Raahi Finds the Impact */}
-      <section className="py-24 bg-slate-50">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <ScrollSection>
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('story4Title')}
-            </h2>
-            <p className="text-lg text-slate-500 mb-16">{t('story4Sub')}</p>
-          </ScrollSection>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { value: 4, label: t('bookingsAffected'), icon: '📋', color: 'red' },
-              { value: 3, label: t('connectionsAtRisk'), icon: '🔗', color: 'amber' },
-              { value: 2500, label: t('potentialCost'), icon: '💰', color: 'orange', prefix: '₹' },
-            ].map((stat, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.2 }}
-                className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
-              >
-                <span className="text-3xl mb-4 block">{stat.icon}</span>
-                <p className={`text-4xl font-extrabold mb-2 ${
-                  stat.color === 'red' ? 'text-red-600' : stat.color === 'amber' ? 'text-amber-600' : 'text-orange-600'
-                }`}>
-                  <AnimatedCounter target={stat.value} prefix={stat.prefix || ''} />
-                </p>
-                <p className="text-slate-600 font-medium">{stat.label}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section 5: Recovery Options */}
-      <section className="py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <ScrollSection>
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('story5Title')}
-            </h2>
-            <p className="text-lg text-slate-500 mb-16">{t('story5Sub')}</p>
-          </ScrollSection>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: <DollarSign className="w-6 h-6" />, title: t('cheapest'), cost: '₹1,200', changes: '2 bookings', badge: '💰', color: 'emerald' },
-              { icon: <Zap className="w-6 h-6" />, title: t('fastest'), cost: '₹4,500', changes: '3 hours saved', badge: '⚡', color: 'blue' },
-              { icon: <Star className="w-6 h-6" />, title: t('leastDisruption'), cost: '₹2,800', changes: '1 change', badge: '⭐', color: 'teal', recommended: true },
-            ].map((plan, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15 }}
-                className={`relative bg-white p-8 rounded-2xl shadow-sm border-2 hover:shadow-lg transition-all duration-300 ${
-                  plan.recommended ? 'border-teal-400 ring-2 ring-teal-100' : 'border-slate-100'
-                }`}
-              >
-                {plan.recommended && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-500 text-white text-xs font-bold px-4 py-1 rounded-full">
-                    {t('recommended')}
-                  </div>
-                )}
-                <span className="text-4xl mb-4 block">{plan.badge}</span>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.title}</h3>
-                <p className="text-3xl font-extrabold text-slate-800 mb-1">{plan.cost}</p>
-                <p className="text-sm text-slate-500">{plan.changes}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Section 6: Before / After */}
-      <section className="py-24 bg-slate-50">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <ScrollSection>
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              {t('story6Title')}
-            </h2>
-            <p className="text-lg text-slate-500 mb-16">{t('story6Sub')}</p>
-          </ScrollSection>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <ScrollSection>
-              <div className="bg-white p-6 rounded-2xl border-2 border-red-200 shadow-sm">
-                <h3 className="text-lg font-bold text-red-600 mb-6 flex items-center justify-center gap-2">🔴 {t('before')}</h3>
-                {[
-                  { emoji: '✈️', name: 'AI-204', time: '1:15 PM', status: '🔴 Delayed' },
-                  { emoji: '🚕', name: 'Cab', time: '1:45 PM', status: '🔴 Missed' },
-                  { emoji: '🏨', name: 'Hotel', time: '3:00 PM', status: '🟠 Late' },
-                  { emoji: '🎫', name: 'Concert', time: '7:30 PM', status: '🟠 At Risk' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span>{item.emoji}</span>
-                      <span className="font-medium text-slate-700">{item.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-slate-500">{item.time}</p>
-                      <p className="text-xs font-semibold text-red-500">{item.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollSection>
-
-            <ScrollSection>
-              <div className="bg-white p-6 rounded-2xl border-2 border-green-200 shadow-sm">
-                <h3 className="text-lg font-bold text-green-600 mb-6 flex items-center justify-center gap-2">🟢 {t('after')}</h3>
-                {[
-                  { emoji: '✈️', name: 'AI-315', time: '4:00 PM', status: '🟢 Confirmed' },
-                  { emoji: '🚕', name: 'Cab', time: '5:00 PM', status: '🟢 Rebooked' },
-                  { emoji: '🏨', name: 'Hotel', time: '3:00 PM', status: '🟢 No Change' },
-                  { emoji: '🎫', name: 'Concert', time: '7:30 PM', status: '🟢 Safe' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span>{item.emoji}</span>
-                      <span className="font-medium text-slate-700">{item.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-slate-500">{item.time}</p>
-                      <p className="text-xs font-semibold text-green-600">{item.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollSection>
-          </div>
-
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.5 }} className="mt-12">
-            <Link to="/what-if" className="bg-[#1B2A4A] hover:bg-[#243654] text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all inline-flex items-center gap-2 shadow-lg">
-              {t('whatIfTitle')} — {language === 'hi' ? 'अभी सिमुलेट करें' : 'Try It Now'} <ArrowRight className="w-5 h-5" />
+          <div className="section-copy">
+            <p>
+              From the first booking to the final activity, Raahi connects the moving pieces of your trip and gives you a clear view of what is happening now, what might change, and what to do next.
+            </p>
+            <Link to="/my-trip" className="text-link">
+              Open itinerary <ArrowRight size={15} />
             </Link>
-          </motion.div>
+          </div>
+        </div>
+        <div className="editorial-itinerary">
+          {bookings.slice(0, 5).map((booking, index) => (
+            <div className="editorial-itinerary__row" key={booking.id}>
+              <span className="date-column">
+                {index === 0 ? '12 OCT' : index === 1 ? '13 OCT' : `${14 + index} OCT`}
+              </span>
+              <span className="itinerary-line">
+                <i />
+              </span>
+              <div className="itinerary-place">
+                <strong>{booking.from}</strong>
+                <small>{booking.name}</small>
+              </div>
+              <div className="itinerary-time">
+                <Clock3 size={14} /> {booking.startTime}
+              </div>
+              <span className="itinerary-status">
+                <Check size={13} /> {booking.status === 'confirmed' ? 'Confirmed' : t(booking.status)}
+              </span>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-16 text-center" style={{ background: 'linear-gradient(135deg, #1B2A4A 0%, #0f1d33 100%)' }}>
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <Shield className="h-8 w-8 text-teal-400" />
-          <span className="font-extrabold text-3xl text-white" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>RAAHI</span>
+      {/* Disruption Card Section */}
+      <section className="home-section home-section--disruption">
+        <div className="disruption-layout">
+          <div>
+            <p className="eyebrow eyebrow--muted">Detect · understand · adapt</p>
+            <h2>
+              When something shifts,<br />
+              <em>you see the way forward.</em>
+            </h2>
+            <p className="section-copy-text">
+              Raahi traces the impact across your itinerary, then gives you practical options with the trade-offs made clear.
+            </p>
+            <Link to={activeDisruption ? '/disruptions' : '/what-if'} className="button button--dark">
+              {activeDisruption ? 'Review disruption' : 'Explore a what-if'} <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="disruption-card">
+            <div className="disruption-card__header">
+              <span className="signal-icon">
+                <CircleAlert size={17} />
+              </span>
+              <div>
+                <p className="eyebrow">{activeDisruption ? 'Flight disruption detected' : 'Proactive protection'}</p>
+                <strong>{activeDisruption ? 'A change is affecting your journey' : 'Your connections are being watched'}</strong>
+              </div>
+            </div>
+            <div className="disruption-card__route">
+              <span>Mumbai</span>
+              <div className="disruption-dash">
+                <i /><i /><i />
+              </div>
+              <span>Delhi</span>
+            </div>
+            <div className="disruption-impact">
+              <small>IMPACT ANALYSIS</small>
+              <p>{activeDisruption ? activeDisruption.description : 'Connection buffers, transport timing, and hotel check-in are continuously evaluated.'}</p>
+            </div>
+            <div className="recommendation-row">
+              <span>
+                <Sparkles size={15} /> Raahi recommendation
+              </span>
+              <strong>{recoveryApplied ? 'Recovery applied' : 'Alternative connection available'}</strong>
+              <Link to="/recovery">
+                <ArrowRight size={15} />
+              </Link>
+            </div>
+          </div>
         </div>
-        <p className="text-xl text-slate-300 mb-2 font-medium">{t('footerTagline')}</p>
-        {language === 'en' && <p className="text-lg text-teal-400/70">{t('footerTaglineHi') || 'योजनाएँ बदल सकती हैं, आपकी यात्रा नहीं रुकनी चाहिए।'}</p>}
-        <p className="text-sm text-slate-500 mt-8">© 2025 RAAHI — Intelligent Travel Resilience</p>
-      </footer>
+      </section>
     </div>
   );
 }
